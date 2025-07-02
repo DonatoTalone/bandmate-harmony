@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useEvents } from '@/contexts/EventsContext';
-import { supabase } from '@/integrations/supabase/client';
+import { query } from '@/lib/database';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface HomeScreenProps {

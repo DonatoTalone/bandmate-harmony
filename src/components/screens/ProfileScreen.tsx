@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/contexts/ProfileContext';
-import { uploadFile, createBucketIfNotExists } from '@/integrations/supabase/storage';
 import ProfileSettings from '@/components/ProfileSettings';
 import { Strumento } from '@/types';
 
@@ -54,14 +53,19 @@ const ProfileScreen: React.FC = () => {
     if (!file) return;
 
     try {
-      await createBucketIfNotExists('profile-images');
-      const imageUrl = await uploadFile('profile-images', file, 'avatars');
-      await updateProfile({ foto_profile: imageUrl });
-      
-      toast({
-        title: "Foto aggiornata",
-        description: "La tua foto profilo è stata caricata con successo",
-      });
+      // For now, we'll use a simple base64 conversion
+      // In production, you'd want to upload to a proper file storage service
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64String = e.target?.result as string;
+        await updateProfile({ foto_profile: base64String });
+        
+        toast({
+          title: "Foto aggiornata",
+          description: "La tua foto profilo è stata caricata con successo",
+        });
+      };
+      reader.readAsDataURL(file);
     } catch (error) {
       console.error('Errore nel caricamento dell\'immagine:', error);
       toast({
