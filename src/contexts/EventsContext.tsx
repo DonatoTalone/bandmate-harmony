@@ -1,7 +1,6 @@
-
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Strumento } from '@/types';
-import { supabase } from '@/integrations/supabase/client';
+import { query } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -46,14 +45,7 @@ export const EventsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const loadEventi = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('eventi')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
+      const data = await query('SELECT * FROM eventi ORDER BY created_at DESC');
 
       if (data) {
         const eventiFormattati: Evento[] = data.map(e => ({
@@ -78,13 +70,13 @@ export const EventsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }));
         
         setEventi(eventiFormattati);
-        console.log('Eventi caricati:', eventiFormattati);
+        console.log('Events loaded:', eventiFormattati);
       }
     } catch (error) {
-      console.error('Errore nel caricare gli eventi:', error);
+      console.error('Error loading events:', error);
       toast({
-        title: "Errore",
-        description: "Impossibile caricare gli eventi",
+        title: "Error",
+        description: "Could not load events",
         variant: "destructive"
       });
     } finally {
@@ -99,37 +91,32 @@ export const EventsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const addEvento = async (eventData: Omit<Evento, 'id' | 'createdAt' | 'createdBy'>) => {
     if (!user) {
       toast({
-        title: "Errore",
-        description: "Devi essere autenticato per creare un evento",
+        title: "Error",
+        description: "You must be authenticated to create an event",
         variant: "destructive"
       });
       return;
     }
     
     try {
-      const eventoDB = {
-        organizzatore_id: user.id,
-        titolo: eventData.titolo,
-        descrizione: eventData.descrizione,
-        data: eventData.data,
-        ora_inizio: eventData.oraInizio,
-        ora_fine: eventData.oraFine,
-        luogo: eventData.luogo,
-        tipo_evento: eventData.tipoEvento,
-        tipo_organico: eventData.tipoOrganico,
-        strumenti_richiesti: eventData.strumentiRichiesti
-      };
-      
-      const { data, error } = await supabase
-        .from('eventi')
-        .insert(eventoDB)
-        .select()
-        .single();
+      const newEvents = await query(
+        `INSERT INTO eventi (organizzatore_id, titolo, descrizione, data, ora_inizio, ora_fine, luogo, tipo_evento, tipo_organico, strumenti_richiesti) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+        [
+          user.id,
+          eventData.titolo,
+          eventData.descrizione,
+          eventData.data,
+          eventData.oraInizio,
+          eventData.oraFine,
+          eventData.luogo,
+          eventData.tipoEvento,
+          eventData.tipoOrganico,
+          JSON.stringify(eventData.strumentiRichiesti)
+        ]
+      );
 
-      if (error) {
-        throw error;
-      }
-
+      const data = newEvents[0];
       const nuovoEvento: Evento = {
         id: data.id,
         titolo: data.titolo,
@@ -154,14 +141,14 @@ export const EventsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setEventi(prev => [nuovoEvento, ...prev]);
       
       toast({
-        title: "Evento creato",
-        description: "Il tuo evento è stato aggiunto con successo",
+        title: "Event created",
+        description: "Your event has been added successfully",
       });
     } catch (error) {
-      console.error('Errore durante la creazione dell\'evento:', error);
+      console.error('Error creating event:', error);
       toast({
-        title: "Errore",
-        description: "Impossibile creare l'evento",
+        title: "Error",
+        description: "Could not create event",
         variant: "destructive"
       });
     }
@@ -175,8 +162,8 @@ export const EventsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     citta?: string;
     data?: string;
   }) => {
-    console.log('Filtri ricerca:', filters);
-    console.log('Eventi disponibili:', eventi);
+    console.log('Filters:', filters);
+    console.log('Events available:', eventi);
     
     return eventi.filter(evento => {
       if (filters.strumento) {

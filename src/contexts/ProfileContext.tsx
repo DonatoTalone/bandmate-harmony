@@ -1,6 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { query } from '@/lib/database';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -43,17 +42,14 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
 
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      const profiles = await query('SELECT * FROM profiles WHERE id = $1', [user.id]);
 
-      if (error) {
-        console.error('Errore nel caricamento del profilo:', error);
+      if (profiles.length === 0) {
+        console.error('Profile not found');
         return;
       }
 
+      const data = profiles[0];
       const profileData: ProfileData = {
         id: data.id,
         nome: data.nome,
@@ -78,7 +74,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       setProfile(profileData);
     } catch (error) {
-      console.error('Errore nel caricamento del profilo:', error);
+      console.error('Error loading profile:', error);
     } finally {
       setIsLoading(false);
     }
@@ -88,24 +84,30 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (!user || !profile) return;
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
+      // Build dynamic update query
+      const setClause = Object.keys(updates)
+        .map((key, index) => `${key} = $${index + 1}`)
+        .join(', ');
+      
+      const values = Object.values(updates);
+      values.push(user.id);
 
-      if (error) throw error;
+      await query(
+        `UPDATE profiles SET ${setClause} WHERE id = $${values.length}`,
+        values
+      );
 
       setProfile(prev => prev ? { ...prev, ...updates } : null);
       
       toast({
-        title: "Profilo aggiornato",
-        description: "Le modifiche sono state salvate con successo",
+        title: "Profile updated",
+        description: "Changes saved successfully",
       });
     } catch (error) {
-      console.error('Errore nell\'aggiornamento del profilo:', error);
+      console.error('Profile update error:', error);
       toast({
-        title: "Errore",
-        description: "Impossibile aggiornare il profilo",
+        title: "Error",
+        description: "Could not update profile",
         variant: "destructive"
       });
     }
