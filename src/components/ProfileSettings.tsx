@@ -20,9 +20,9 @@ const ProfileSettings: React.FC = () => {
     telefono: profile?.telefono || '',
     citta: profile?.citta || '',
     impostazioni_privacy: profile?.impostazioni_privacy || {
-      telefono: 'privato',
-      email: 'privato',
-      disponibilita: 'pubblico',
+      telefono: 'privato' as const,
+      email: 'privato' as const,
+      disponibilita: 'pubblico' as const,
       accetta_recensioni: true
     }
   });
@@ -90,7 +90,10 @@ const ProfileSettings: React.FC = () => {
                   value={settings.impostazioni_privacy.telefono}
                   onValueChange={(value) => setSettings(prev => ({
                     ...prev,
-                    impostazioni_privacy: { ...prev.impostazioni_privacy, telefono: value }
+                    impostazioni_privacy: { 
+                      ...prev.impostazioni_privacy, 
+                      telefono: value as 'pubblico' | 'privato' | 'soloPartecipanti'
+                    }
                   }))}
                 >
                   <SelectTrigger className="w-32">
@@ -113,7 +116,10 @@ const ProfileSettings: React.FC = () => {
                   value={settings.impostazioni_privacy.email}
                   onValueChange={(value) => setSettings(prev => ({
                     ...prev,
-                    impostazioni_privacy: { ...prev.impostazioni_privacy, email: value }
+                    impostazioni_privacy: { 
+                      ...prev.impostazioni_privacy, 
+                      email: value as 'pubblico' | 'privato' | 'soloPartecipanti'
+                    }
                   }))}
                 >
                   <SelectTrigger className="w-32">
@@ -136,7 +142,10 @@ const ProfileSettings: React.FC = () => {
                   value={settings.impostazioni_privacy.disponibilita}
                   onValueChange={(value) => setSettings(prev => ({
                     ...prev,
-                    impostazioni_privacy: { ...prev.impostazioni_privacy, disponibilita: value }
+                    impostazioni_privacy: { 
+                      ...prev.impostazioni_privacy, 
+                      disponibilita: value as 'pubblico' | 'privato'
+                    }
                   }))}
                 >
                   <SelectTrigger className="w-32">
