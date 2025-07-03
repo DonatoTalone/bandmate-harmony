@@ -1,194 +1,171 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Strumento } from '@/types';
-import { query } from '@/lib/database';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface Evento {
   id: string;
   titolo: string;
   descrizione: string;
   data: string;
-  oraInizio: string;
-  oraFine: string;
+  ora: string;
   luogo: string;
-  tipoEvento: string;
-  tipoOrganico: string;
-  strumentiRichiesti: { strumento: Strumento; numero: number; descrizione: string }[];
-  createdBy: string;
-  createdAt: string;
+  citta: string;
+  tipoEvento: 'Concerto' | 'Jam Session' | 'Prova' | 'Workshop' | 'Altro';
+  generesMusicali: string[];
+  maxPartecipanti?: number;
+  costoPartecipazione?: number;
+  strumentiRichiesti: string[];
+  livelloRichiesto: 'Principiante' | 'Intermedio' | 'Avanzato' | 'Professionale';
+  createBy: string;
+  partecipanti: string[];
 }
 
 interface EventsContextType {
   eventi: Evento[];
-  addEvento: (evento: Omit<Evento, 'id' | 'createdAt' | 'createdBy'>) => Promise<void>;
-  searchEventi: (filters: {
-    strumento?: Strumento;
-    tipoEvento?: string;
-    regione?: string;
-    provincia?: string;
-    citta?: string;
-    data?: string;
-  }) => Evento[];
-  loadEventi: () => Promise<void>;
+  addEvento: (evento: Omit<Evento, 'id' | 'createBy' | 'partecipanti'>) => Promise<void>;
+  updateEvento: (id: string, evento: Partial<Evento>) => Promise<void>;
+  deleteEvento: (id: string) => Promise<void>;
+  joinEvento: (id: string) => Promise<void>;
+  leaveEvento: (id: string) => Promise<void>;
   isLoading: boolean;
 }
 
 const EventsContext = createContext<EventsContextType | undefined>(undefined);
 
-export const EventsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [eventi, setEventi] = useState<Evento[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
-  const { user } = useAuth();
-
-  const loadEventi = async () => {
-    try {
-      setIsLoading(true);
-      const data = await query('SELECT * FROM eventi ORDER BY created_at DESC');
-
-      if (data) {
-        const eventiFormattati: Evento[] = data.map(e => ({
-          id: e.id,
-          titolo: e.titolo,
-          descrizione: e.descrizione || '',
-          data: e.data,
-          oraInizio: e.ora_inizio,
-          oraFine: e.ora_fine,
-          luogo: e.luogo,
-          tipoEvento: e.tipo_evento,
-          tipoOrganico: e.tipo_organico || '',
-          strumentiRichiesti: Array.isArray(e.strumenti_richiesti) 
-            ? (e.strumenti_richiesti as any[]).map(sr => ({
-                strumento: sr.strumento || 'Altro',
-                numero: sr.numero || 1,
-                descrizione: sr.descrizione || ''
-              }))
-            : [],
-          createdBy: e.organizzatore_id,
-          createdAt: e.created_at
-        }));
-        
-        setEventi(eventiFormattati);
-        console.log('Events loaded:', eventiFormattati);
-      }
-    } catch (error) {
-      console.error('Error loading events:', error);
-      toast({
-        title: "Error",
-        description: "Could not load events",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const loadEventi = async () => {
+      try {
+        const savedEvents = localStorage.getItem('mock_events');
+        if (savedEvents) {
+          setEventi(JSON.parse(savedEvents));
+        } else {
+          // Create some mock events
+          const mockEvents: Evento[] = [
+            {
+              id: '1',
+              titolo: 'Jam Session Jazz',
+              descrizione: 'Serata di improvvisazione jazz per musicisti di tutti i livelli',
+              data: '2024-07-10',
+              ora: '20:00',
+              luogo: 'Blue Note Milano',
+              citta: 'Milano',
+              tipoEvento: 'Jam Session',
+              generesMusicali: ['Jazz', 'Blues'],
+              maxPartecipanti: 8,
+              strumentiRichiesti: ['Pianoforte', 'Chitarra', 'Batteria', 'Basso'],
+              livelloRichiesto: 'Intermedio',
+              createBy: '1',
+              partecipanti: []
+            },
+            {
+              id: '2',
+              titolo: 'Concerto Rock',
+              descrizione: 'Serata rock con band locali',
+              data: '2024-07-15',
+              ora: '21:30',
+              luogo: 'Rock Cafe',
+              citta: 'Roma',
+              tipoEvento: 'Concerto',
+              generesMusicali: ['Rock', 'Alternative'],
+              maxPartecipanti: 5,
+              strumentiRichiesti: ['Chitarra', 'Basso', 'Batteria', 'Voce'],
+              livelloRichiesto: 'Avanzato',
+              createBy: '1',
+              partecipanti: []
+            }
+          ];
+          setEventi(mockEvents);
+          localStorage.setItem('mock_events', JSON.stringify(mockEvents));
+        }
+      } catch (error) {
+        console.error('Errore nel caricamento degli eventi:', error);
+      }
+      setIsLoading(false);
+    };
+
     loadEventi();
   }, []);
 
-  const addEvento = async (eventData: Omit<Evento, 'id' | 'createdAt' | 'createdBy'>) => {
-    if (!user) {
-      toast({
-        title: "Error",
-        description: "You must be authenticated to create an event",
-        variant: "destructive"
-      });
-      return;
-    }
-    
+  const addEvento = async (eventoData: Omit<Evento, 'id' | 'createBy' | 'partecipanti'>) => {
     try {
-      const newEvents = await query(
-        `INSERT INTO eventi (organizzatore_id, titolo, descrizione, data, ora_inizio, ora_fine, luogo, tipo_evento, tipo_organico, strumenti_richiesti) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-        [
-          user.id,
-          eventData.titolo,
-          eventData.descrizione,
-          eventData.data,
-          eventData.oraInizio,
-          eventData.oraFine,
-          eventData.luogo,
-          eventData.tipoEvento,
-          eventData.tipoOrganico,
-          JSON.stringify(eventData.strumentiRichiesti)
-        ]
-      );
-
-      const data = newEvents[0];
-      const nuovoEvento: Evento = {
-        id: data.id,
-        titolo: data.titolo,
-        descrizione: data.descrizione || '',
-        data: data.data,
-        oraInizio: data.ora_inizio,
-        oraFine: data.ora_fine,
-        luogo: data.luogo,
-        tipoEvento: data.tipo_evento,
-        tipoOrganico: data.tipo_organico || '',
-        strumentiRichiesti: Array.isArray(data.strumenti_richiesti) 
-          ? (data.strumenti_richiesti as any[]).map(sr => ({
-              strumento: sr.strumento || 'Altro',
-              numero: sr.numero || 1,
-              descrizione: sr.descrizione || ''
-            }))
-          : [],
-        createdBy: data.organizzatore_id,
-        createdAt: data.created_at
+      const newEvento: Evento = {
+        ...eventoData,
+        id: Date.now().toString(),
+        createBy: '1',
+        partecipanti: []
       };
       
-      setEventi(prev => [nuovoEvento, ...prev]);
-      
-      toast({
-        title: "Event created",
-        description: "Your event has been added successfully",
-      });
+      const updatedEventi = [...eventi, newEvento];
+      setEventi(updatedEventi);
+      localStorage.setItem('mock_events', JSON.stringify(updatedEventi));
     } catch (error) {
-      console.error('Error creating event:', error);
-      toast({
-        title: "Error",
-        description: "Could not create event",
-        variant: "destructive"
-      });
+      console.error('Errore nell\'aggiunta dell\'evento:', error);
     }
   };
 
-  const searchEventi = (filters: {
-    strumento?: Strumento;
-    tipoEvento?: string;
-    regione?: string;
-    provincia?: string;
-    citta?: string;
-    data?: string;
-  }) => {
-    console.log('Filters:', filters);
-    console.log('Events available:', eventi);
-    
-    return eventi.filter(evento => {
-      if (filters.strumento) {
-        const hasStrumento = evento.strumentiRichiesti.some(sr => sr.strumento === filters.strumento);
-        if (!hasStrumento) return false;
-      }
+  const updateEvento = async (id: string, eventoData: Partial<Evento>) => {
+    try {
+      const updatedEventi = eventi.map(evento => 
+        evento.id === id ? { ...evento, ...eventoData } : evento
+      );
+      setEventi(updatedEventi);
+      localStorage.setItem('mock_events', JSON.stringify(updatedEventi));
+    } catch (error) {
+      console.error('Errore nell\'aggiornamento dell\'evento:', error);
+    }
+  };
 
-      if (filters.tipoEvento && evento.tipoEvento !== filters.tipoEvento) {
-        return false;
-      }
+  const deleteEvento = async (id: string) => {
+    try {
+      const updatedEventi = eventi.filter(evento => evento.id !== id);
+      setEventi(updatedEventi);
+      localStorage.setItem('mock_events', JSON.stringify(updatedEventi));
+    } catch (error) {
+      console.error('Errore nell\'eliminazione dell\'evento:', error);
+    }
+  };
 
-      if (filters.data && evento.data !== filters.data) {
-        return false;
-      }
+  const joinEvento = async (id: string) => {
+    try {
+      const updatedEventi = eventi.map(evento => 
+        evento.id === id 
+          ? { ...evento, partecipanti: [...evento.partecipanti, '1'] }
+          : evento
+      );
+      setEventi(updatedEventi);
+      localStorage.setItem('mock_events', JSON.stringify(updatedEventi));
+    } catch (error) {
+      console.error('Errore nella partecipazione all\'evento:', error);
+    }
+  };
 
-      if (filters.citta && !evento.luogo.toLowerCase().includes(filters.citta.toLowerCase())) {
-        return false;
-      }
-
-      return true;
-    });
+  const leaveEvento = async (id: string) => {
+    try {
+      const updatedEventi = eventi.map(evento => 
+        evento.id === id 
+          ? { ...evento, partecipanti: evento.partecipanti.filter(p => p !== '1') }
+          : evento
+      );
+      setEventi(updatedEventi);
+      localStorage.setItem('mock_events', JSON.stringify(updatedEventi));
+    } catch (error) {
+      console.error('Errore nell\'uscita dall\'evento:', error);
+    }
   };
 
   return (
-    <EventsContext.Provider value={{ eventi, addEvento, searchEventi, loadEventi, isLoading }}>
+    <EventsContext.Provider value={{
+      eventi,
+      addEvento,
+      updateEvento,
+      deleteEvento,
+      joinEvento,
+      leaveEvento,
+      isLoading
+    }}>
       {children}
     </EventsContext.Provider>
   );

@@ -1,128 +1,82 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { query } from '@/lib/database';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 interface ProfileData {
-  id: string;
-  nome: string;
-  cognome: string;
+  id?: string;
+  user_id?: string;
+  nome?: string;
+  cognome?: string;
   nome_arte?: string;
-  email: string;
-  telefono?: string;
-  citta?: string;
-  raggio_attivita: number;
   bio?: string;
+  citta?: string;
+  raggio_attivita?: number;
   foto_profile?: string;
-  strumenti: Array<{ strumento: string; livello: string; anni_esperienza: number }>;
-  social_media: Record<string, string>;
-  impostazioni_privacy: Record<string, any>;
+  strumenti?: Array<{
+    strumento: string;
+    livello: string;
+    anni_esperienza: number;
+  }>;
 }
 
 interface ProfileContextType {
   profile: ProfileData | null;
+  updateProfile: (data: Partial<ProfileData>) => Promise<void>;
   isLoading: boolean;
-  updateProfile: (updates: Partial<ProfileData>) => Promise<void>;
-  refreshProfile: () => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
-export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
-  const { toast } = useToast();
-
-  const loadProfile = async () => {
-    if (!user) {
-      setProfile(null);
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const profiles = await query('SELECT * FROM profiles WHERE id = $1', [user.id]);
-
-      if (profiles.length === 0) {
-        console.error('Profile not found');
-        return;
-      }
-
-      const data = profiles[0];
-      const profileData: ProfileData = {
-        id: data.id,
-        nome: data.nome,
-        cognome: data.cognome,
-        nome_arte: data.nome_arte,
-        email: data.email,
-        telefono: data.telefono,
-        citta: data.citta,
-        raggio_attivita: data.raggio_attivita || 25,
-        bio: data.bio,
-        foto_profile: data.foto_profile,
-        strumenti: Array.isArray(data.strumenti) 
-          ? (data.strumenti as any[]).map(s => ({
-              strumento: s.strumento || '',
-              livello: s.livello || 'Principiante',
-              anni_esperienza: s.anni_esperienza || 0
-            }))
-          : [],
-        social_media: typeof data.social_media === 'object' ? data.social_media as Record<string, string> : {},
-        impostazioni_privacy: typeof data.impostazioni_privacy === 'object' ? data.impostazioni_privacy as Record<string, any> : {}
-      };
-
-      setProfile(profileData);
-    } catch (error) {
-      console.error('Error loading profile:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const updateProfile = async (updates: Partial<ProfileData>) => {
-    if (!user || !profile) return;
-
-    try {
-      // Build dynamic update query
-      const setClause = Object.keys(updates)
-        .map((key, index) => `${key} = $${index + 1}`)
-        .join(', ');
-      
-      const values = Object.values(updates);
-      values.push(user.id);
-
-      await query(
-        `UPDATE profiles SET ${setClause} WHERE id = $${values.length}`,
-        values
-      );
-
-      setProfile(prev => prev ? { ...prev, ...updates } : null);
-      
-      toast({
-        title: "Profile updated",
-        description: "Changes saved successfully",
-      });
-    } catch (error) {
-      console.error('Profile update error:', error);
-      toast({
-        title: "Error",
-        description: "Could not update profile",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const refreshProfile = async () => {
-    await loadProfile();
-  };
 
   useEffect(() => {
+    const loadProfile = async () => {
+      if (user) {
+        try {
+          const savedProfile = localStorage.getItem('mock_profile');
+          if (savedProfile) {
+            setProfile(JSON.parse(savedProfile));
+          } else {
+            // Create default profile
+            const defaultProfile = {
+              id: user.id,
+              user_id: user.id,
+              nome: user.nome,
+              cognome: user.cognome,
+              strumenti: []
+            };
+            setProfile(defaultProfile);
+            localStorage.setItem('mock_profile', JSON.stringify(defaultProfile));
+          }
+        } catch (error) {
+          console.error('Errore nel caricamento del profilo:', error);
+        }
+      } else {
+        setProfile(null);
+      }
+      setIsLoading(false);
+    };
+
     loadProfile();
   }, [user]);
 
+  const updateProfile = async (data: Partial<ProfileData>) => {
+    try {
+      if (profile) {
+        const updatedProfile = { ...profile, ...data };
+        setProfile(updatedProfile);
+        localStorage.setItem('mock_profile', JSON.stringify(updatedProfile));
+      }
+    } catch (error) {
+      console.error('Errore nell\'aggiornamento del profilo:', error);
+    }
+  };
+
   return (
-    <ProfileContext.Provider value={{ profile, isLoading, updateProfile, refreshProfile }}>
+    <ProfileContext.Provider value={{ profile, updateProfile, isLoading }}>
       {children}
     </ProfileContext.Provider>
   );
