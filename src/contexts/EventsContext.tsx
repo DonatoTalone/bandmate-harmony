@@ -1,31 +1,41 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+
+interface StrumentoRichiesto {
+  strumento: string;
+  numero: number;
+  descrizione?: string;
+}
 
 interface Evento {
   id: string;
   titolo: string;
   descrizione: string;
   data: string;
-  ora: string;
+  oraInizio: string;
+  oraFine: string;
   luogo: string;
-  citta: string;
+  citta?: string;
   tipoEvento: 'Concerto' | 'Jam Session' | 'Prova' | 'Workshop' | 'Altro';
-  generesMusicali: string[];
+  tipoOrganico?: string;
+  generesMusicali?: string[];
   maxPartecipanti?: number;
   costoPartecipazione?: number;
-  strumentiRichiesti: string[];
-  livelloRichiesto: 'Principiante' | 'Intermedio' | 'Avanzato' | 'Professionale';
+  strumentiRichiesti: StrumentoRichiesto[];
+  livelloRichiesto?: 'Principiante' | 'Intermedio' | 'Avanzato' | 'Professionale';
   createBy: string;
   partecipanti: string[];
 }
 
 interface EventsContextType {
   eventi: Evento[];
-  addEvento: (evento: Omit<Evento, 'id' | 'createBy' | 'partecipanti'>) => Promise<void>;
+  addEvento: (evento: any) => Promise<void>;
   updateEvento: (id: string, evento: Partial<Evento>) => Promise<void>;
   deleteEvento: (id: string) => Promise<void>;
   joinEvento: (id: string) => Promise<void>;
   leaveEvento: (id: string) => Promise<void>;
+  searchEventi: (filtri: any) => Evento[];
   isLoading: boolean;
 }
 
@@ -34,6 +44,7 @@ const EventsContext = createContext<EventsContextType | undefined>(undefined);
 export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadEventi = async () => {
@@ -49,13 +60,19 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               titolo: 'Jam Session Jazz',
               descrizione: 'Serata di improvvisazione jazz per musicisti di tutti i livelli',
               data: '2024-07-10',
-              ora: '20:00',
+              oraInizio: '20:00',
+              oraFine: '23:00',
               luogo: 'Blue Note Milano',
               citta: 'Milano',
               tipoEvento: 'Jam Session',
               generesMusicali: ['Jazz', 'Blues'],
               maxPartecipanti: 8,
-              strumentiRichiesti: ['Pianoforte', 'Chitarra', 'Batteria', 'Basso'],
+              strumentiRichiesti: [
+                { strumento: 'Pianoforte', numero: 1 },
+                { strumento: 'Chitarra', numero: 1 },
+                { strumento: 'Batteria', numero: 1 },
+                { strumento: 'Basso', numero: 1 }
+              ],
               livelloRichiesto: 'Intermedio',
               createBy: '1',
               partecipanti: []
@@ -65,13 +82,19 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               titolo: 'Concerto Rock',
               descrizione: 'Serata rock con band locali',
               data: '2024-07-15',
-              ora: '21:30',
+              oraInizio: '21:30',
+              oraFine: '00:30',
               luogo: 'Rock Cafe',
               citta: 'Roma',
               tipoEvento: 'Concerto',
               generesMusicali: ['Rock', 'Alternative'],
               maxPartecipanti: 5,
-              strumentiRichiesti: ['Chitarra', 'Basso', 'Batteria', 'Voce'],
+              strumentiRichiesti: [
+                { strumento: 'Chitarra', numero: 2 },
+                { strumento: 'Basso', numero: 1 },
+                { strumento: 'Batteria', numero: 1 },
+                { strumento: 'Voce', numero: 1 }
+              ],
               livelloRichiesto: 'Avanzato',
               createBy: '1',
               partecipanti: []
@@ -89,7 +112,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     loadEventi();
   }, []);
 
-  const addEvento = async (eventoData: Omit<Evento, 'id' | 'createBy' | 'partecipanti'>) => {
+  const addEvento = async (eventoData: any) => {
     try {
       const newEvento: Evento = {
         ...eventoData,
@@ -101,8 +124,18 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const updatedEventi = [...eventi, newEvento];
       setEventi(updatedEventi);
       localStorage.setItem('mock_events', JSON.stringify(updatedEventi));
+      
+      toast({
+        title: "Evento creato!",
+        description: "Il tuo evento è stato creato con successo.",
+      });
     } catch (error) {
       console.error('Errore nell\'aggiunta dell\'evento:', error);
+      toast({
+        title: "Errore",
+        description: "Impossibile creare l'evento.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -156,6 +189,32 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const searchEventi = (filtri: any) => {
+    let risultati = [...eventi];
+
+    if (filtri.strumento) {
+      risultati = risultati.filter(evento => 
+        evento.strumentiRichiesti.some(sr => sr.strumento === filtri.strumento)
+      );
+    }
+
+    if (filtri.tipoEvento) {
+      risultati = risultati.filter(evento => evento.tipoEvento === filtri.tipoEvento);
+    }
+
+    if (filtri.citta) {
+      risultati = risultati.filter(evento => 
+        evento.citta?.toLowerCase().includes(filtri.citta.toLowerCase())
+      );
+    }
+
+    if (filtri.data) {
+      risultati = risultati.filter(evento => evento.data === filtri.data);
+    }
+
+    return risultati;
+  };
+
   return (
     <EventsContext.Provider value={{
       eventi,
@@ -164,6 +223,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       deleteEvento,
       joinEvento,
       leaveEvento,
+      searchEventi,
       isLoading
     }}>
       {children}

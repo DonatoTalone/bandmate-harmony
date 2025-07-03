@@ -12,6 +12,13 @@ interface ProfileData {
   citta?: string;
   raggio_attivita?: number;
   foto_profile?: string;
+  telefono?: string;
+  impostazioni_privacy?: {
+    telefono: 'pubblico' | 'privato' | 'soloPartecipanti';
+    email: 'pubblico' | 'privato' | 'soloPartecipanti';
+    disponibilita: 'pubblico' | 'privato';
+    accetta_recensioni: boolean;
+  };
   strumenti?: Array<{
     strumento: string;
     livello: string;
@@ -46,6 +53,13 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
               user_id: user.id,
               nome: user.nome,
               cognome: user.cognome,
+              telefono: '',
+              impostazioni_privacy: {
+                telefono: 'privato' as const,
+                email: 'privato' as const,
+                disponibilita: 'pubblico' as const,
+                accetta_recensioni: true
+              },
               strumenti: []
             };
             setProfile(defaultProfile);
