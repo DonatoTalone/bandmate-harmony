@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Search, MapPin, Music, Star } from 'lucide-react';
-import { query } from '@/lib/database';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface UserProfile {
@@ -39,34 +39,29 @@ const UserSearchTab: React.FC = () => {
     try {
       setIsLoading(true);
       
-      // Search with ILIKE for case-insensitive search
+      // Ricerca migliorata che supporta nome e cognome insieme
       const searchTerms = searchQuery.trim().split(' ');
-      let sqlQuery = '';
-      let params: string[] = [];
+      let query = supabase.from('profiles').select('*');
       
       if (searchTerms.length === 1) {
-        sqlQuery = `
-          SELECT * FROM profiles 
-          WHERE nome ILIKE $1 OR cognome ILIKE $1 OR nome_arte ILIKE $1
-        `;
-        params = [`%${searchTerms[0]}%`];
+        // Ricerca singola parola in tutti i campi
+        query = query.or(`nome.ilike.%${searchTerms[0]}%,cognome.ilike.%${searchTerms[0]}%,nome_arte.ilike.%${searchTerms[0]}%`);
       } else if (searchTerms.length === 2) {
-        sqlQuery = `
-          SELECT * FROM profiles 
-          WHERE (nome ILIKE $1 AND cognome ILIKE $2) 
-             OR (nome ILIKE $2 AND cognome ILIKE $1) 
-             OR nome_arte ILIKE $3
-        `;
-        params = [`%${searchTerms[0]}%`, `%${searchTerms[1]}%`, `%${searchQuery}%`];
+        // Ricerca con due parole: nome e cognome o viceversa
+        const [first, second] = searchTerms;
+        query = query.or(
+          `and(nome.ilike.%${first}%,cognome.ilike.%${second}%),and(nome.ilike.%${second}%,cognome.ilike.%${first}%),nome_arte.ilike.%${searchQuery}%`
+        );
       } else {
-        sqlQuery = `
-          SELECT * FROM profiles 
-          WHERE nome_arte ILIKE $1 OR nome ILIKE $1 OR cognome ILIKE $1
-        `;
-        params = [`%${searchQuery}%`];
+        // Ricerca con più parole: cerca la stringa completa nel nome_arte o nei singoli campi
+        query = query.or(`nome_arte.ilike.%${searchQuery}%,nome.ilike.%${searchQuery}%,cognome.ilike.%${searchQuery}%`);
       }
 
-      const data = await query(sqlQuery, params);
+      const { data, error } = await query;
+
+      if (error) {
+        throw error;
+      }
 
       const userProfiles: UserProfile[] = (data || []).map(profile => ({
         id: profile.id,
