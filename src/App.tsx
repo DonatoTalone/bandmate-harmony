@@ -10,12 +10,12 @@ import { EventsProvider } from "@/contexts/EventsContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
-// Configura il client per le query
+// Configure query client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      staleTime: 60 * 1000, // 1 minuto
+      staleTime: 60 * 1000, // 1 minute
     },
   },
 });

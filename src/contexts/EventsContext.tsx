@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Strumento } from '@/types';
-import { supabase } from '@/integrations/supabase/client';
+import { apiCall } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -46,16 +46,9 @@ export const EventsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const loadEventi = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('eventi')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const data = await apiCall('/events');
 
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
+      if (data && Array.isArray(data)) {
         const eventiFormattati: Evento[] = data.map(e => ({
           id: e.id,
           titolo: e.titolo,
@@ -120,15 +113,10 @@ export const EventsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         strumenti_richiesti: eventData.strumentiRichiesti
       };
       
-      const { data, error } = await supabase
-        .from('eventi')
-        .insert(eventoDB)
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
+      const data = await apiCall('/events', {
+        method: 'POST',
+        body: JSON.stringify(eventoDB),
+      });
 
       const nuovoEvento: Evento = {
         id: data.id,

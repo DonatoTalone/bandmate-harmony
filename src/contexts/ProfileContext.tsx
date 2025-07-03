@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { apiCall } from '@/lib/database';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -43,16 +43,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
 
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Errore nel caricamento del profilo:', error);
-        return;
-      }
+      const data = await apiCall(`/profiles/${user.id}`);
 
       const profileData: ProfileData = {
         id: data.id,
@@ -88,12 +79,10 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (!user || !profile) return;
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
-
-      if (error) throw error;
+      await apiCall(`/profiles/${user.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
 
       setProfile(prev => prev ? { ...prev, ...updates } : null);
       

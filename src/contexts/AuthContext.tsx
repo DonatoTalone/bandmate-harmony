@@ -1,7 +1,21 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Session, User } from '@supabase/supabase-js';
+import { apiCall } from '@/lib/database';
+
+interface User {
+  id: string;
+  email: string;
+  nome: string;
+  cognome: string;
+  created_at: string;
+  user_metadata?: any;
+}
+
+interface Session {
+  access_token: string;
+  user: User;
+  expires_at: number;
+}
 
 type AuthContextType = {
   user: User | null;
@@ -21,28 +35,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    // Check for existing session on mount
+    const checkSession = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+          const userData = await apiCall('/auth/me');
+          setUser(userData.user);
+          setSession({
+            access_token: token,
+            user: userData.user,
+            expires_at: Date.now() + 3600000 // 1 hour
+          });
+        }
+      } catch (error) {
+        console.error('Session check failed:', error);
+        localStorage.removeItem('auth_token');
+      } finally {
+        setIsLoading(false);
       }
-    );
+    };
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    checkSession();
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error };
+      const response = await apiCall('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.error) {
+        return { error: response.error };
+      }
+
+      localStorage.setItem('auth_token', response.access_token);
+      setUser(response.user);
+      setSession({
+        access_token: response.access_token,
+        user: response.user,
+        expires_at: Date.now() + 3600000
+      });
+
+      return { error: null };
     } catch (error) {
       console.error("Errore durante il login:", error);
       return { error };
@@ -51,19 +87,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signup = async (email: string, password: string, nome: string, cognome: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            nome,
-            cognome
-          },
-          emailRedirectTo: `${window.location.origin}/`
-        }
+      const response = await apiCall('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, nome, cognome }),
       });
-      
-      return { error };
+
+      if (response.error) {
+        return { error: response.error };
+      }
+
+      return { error: null };
     } catch (error) {
       console.error("Errore durante la registrazione:", error);
       return { error };
@@ -71,19 +104,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await apiCall('/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('auth_token');
+      setUser(null);
+      setSession(null);
+    }
   };
 
   const updateUser = async (userData: any) => {
     if (!user) return;
     
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update(userData)
-        .eq('id', user.id);
-        
-      if (error) throw error;
+      const response = await apiCall('/profiles/update', {
+        method: 'PUT',
+        body: JSON.stringify(userData),
+      });
+      
+      setUser(prev => prev ? { ...prev, ...response.user } : null);
     } catch (error) {
       console.error('Errore durante l\'aggiornamento del profilo:', error);
       throw error;
