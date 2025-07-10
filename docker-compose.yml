@@ -1,25 +1,48 @@
 version: '3.8'
 
 services:
-  app:
-    build: .
+  # Frontend React App
+  frontend:
+    build: 
+      context: .
+      dockerfile: Dockerfile.frontend
     ports:
-      - "3000:3000" # adjust if your app uses a different port
+      - "8080:8080"
     environment:
-      # Change these to match your app's needs
-      DATABASE_URL: postgres://postgres:postgres@db:5432/bandmate
-      NODE_ENV: production
+      - VITE_API_URL=http://backend:3001/api
+    depends_on:
+      - backend
+
+  # Backend API Server (you need to create this)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "3001:3001"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=bandmate_harmony
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - NODE_ENV=production
     depends_on:
       - db
 
+  # PostgreSQL Database
   db:
     image: postgres:16
     environment:
-      POSTGRES_DB: bandmate
+      POSTGRES_DB: bandmate_harmony
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
 
 volumes:
   db_data:
