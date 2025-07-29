@@ -5,26 +5,15 @@ networks:
     driver: bridge
     
 services:
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx-api.conf:/etc/nginx/nginx.conf
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - app_net
-
   # Frontend React App
   frontend:
     build: 
       context: .
       dockerfile: Dockerfile.frontend
+    ports:
+      - "8080:8080"
     environment:
-      - VITE_API_URL=http://localhost/api
+      - VITE_API_URL=http://backend:3001/api
     depends_on:
       - backend
     networks:
