@@ -20,7 +20,10 @@ const pool = new Pool({
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:8080', 'https://id-preview--b8716811-3cc0-4175-a177-a4c88e90b684.lovable.app'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Test route
@@ -153,15 +156,54 @@ app.put('/api/profiles/:id', async (req, res) => {
   res.status(501).json({ message: 'Profile update endpoint not implemented yet' });
 });
 
-// Events routes placeholder
+// Events routes
 app.get('/api/events', async (req, res) => {
-  // TODO: Implement events listing
-  res.status(501).json({ message: 'Events endpoint not implemented yet' });
+  try {
+    const result = await pool.query(`
+      SELECT 
+        id, titolo, descrizione, data, ora_inizio, ora_fine, 
+        luogo, tipo_evento, tipo_organico, strumenti_richiesti, 
+        created_by, created_at
+      FROM eventi 
+      ORDER BY data ASC, ora_inizio ASC
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-app.post('/api/events', async (req, res) => {
-  // TODO: Implement event creation
-  res.status(501).json({ message: 'Event creation endpoint not implemented yet' });
+app.post('/api/events', authenticateToken, async (req, res) => {
+  try {
+    const {
+      titolo, descrizione, data, oraInizio, oraFine,
+      luogo, tipoEvento, tipoOrganico, strumentiRichiesti
+    } = req.body;
+
+    if (!titolo || !data || !luogo) {
+      return res.status(400).json({ error: 'Titolo, data e luogo sono obbligatori' });
+    }
+
+    const result = await pool.query(`
+      INSERT INTO eventi (
+        titolo, descrizione, data, ora_inizio, ora_fine,
+        luogo, tipo_evento, tipo_organico, strumenti_richiesti,
+        created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *
+    `, [
+      titolo, descrizione, data, oraInizio, oraFine,
+      luogo, tipoEvento, tipoOrganico, 
+      JSON.stringify(strumentiRichiesti), req.user.userId
+    ]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating event:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Start server
