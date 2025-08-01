@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 require('dotenv').config();
+const pool = require('./db');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -29,6 +30,33 @@ app.use(express.json());
 // Test route
 app.get('/api/health', (req, res) => {
   res.json({ message: 'Bandmate Harmony API is running' });
+});
+
+// Ensure the users table exists
+async function ensureUsersTableExists() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL UNIQUE,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✅ Users table checked/created.");
+  } catch (err) {
+    console.error("❌ Failed to ensure users table exists:", err);
+    process.exit(1); // exit if DB setup fails
+  }
+}
+
+// Start the app after ensuring the table
+ensureUsersTableExists().then(() => {
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`🚀 Backend running on port ${PORT}`);
+  });
 });
 
 // Auth middleware
