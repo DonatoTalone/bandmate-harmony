@@ -1,38 +1,27 @@
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
-require('dotenv').config();
-const pool = require('./db');
-
 const app = express();
-const port = process.env.PORT || 3001;
+const pool = require('./db');
+const authRoutes = require('./routes/authRoutes');
+const bandRoutes = require('./routes/bandRoutes');
+const songRoutes = require('./routes/songRoutes');
+const playlistRoutes = require('./routes/playlistRoutes');
+const invitationRoutes = require('./routes/invitationRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
-
-// Middleware
-app.use(helmet());
-app.use(cors({
-  origin: ['http://localhost:8080', 'https://id-preview--b8716811-3cc0-4175-a177-a4c88e90b684.lovable.app'],
-  credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
-// Test route
-app.get('/api/health', (req, res) => {
-  res.json({ message: 'Bandmate Harmony API is running' });
-});
+app.use('/api/auth', authRoutes);
+app.use('/api/bands', bandRoutes);
+app.use('/api/songs', songRoutes);
+app.use('/api/playlists', playlistRoutes);
+app.use('/api/invitations', invitationRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/search', searchRoutes);
 
-// Ensure the users table exists
+// ✅ Create users table if it doesn't exist
 async function ensureUsersTableExists() {
   try {
     await pool.query(`
@@ -44,197 +33,17 @@ async function ensureUsersTableExists() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log("✅ Users table checked/created.");
+    console.log('✅ Users table ensured.');
   } catch (err) {
-    console.error("❌ Failed to ensure users table exists:", err);
-    process.exit(1); // exit if DB setup fails
+    console.error('❌ Error ensuring users table:', err);
+    process.exit(1);
   }
 }
 
-// Start the app after ensuring the table
+// ✅ Start the server only after the table is ensured
 ensureUsersTableExists().then(() => {
   const PORT = process.env.PORT || 3001;
   app.listen(PORT, () => {
-    console.log(`🚀 Backend running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
   });
-});
-
-// Auth middleware
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Invalid token' });
-    req.user = user;
-    next();
-  });
-};
-
-// Auth routes
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { email, password, nome, cognome } = req.body;
-    
-    if (!email || !password || !nome || !cognome) {
-      return res.status(400).json({ error: 'All fields are required' });
-    }
-
-    // Check if user exists
-    const userExists = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-    if (userExists.rows.length > 0) {
-      return res.status(400).json({ error: 'User already exists' });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const result = await pool.query(
-      'INSERT INTO users (email, password_hash, nome, cognome) VALUES ($1, $2, $3, $4) RETURNING id, email, nome, cognome, created_at',
-      [email, hashedPassword, nome, cognome]
-    );
-
-    res.status(201).json({ 
-      message: 'User created successfully',
-      user: result.rows[0]
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-
-    // Find user
-    const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (userResult.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const user = userResult.rows[0];
-
-    // Check password
-    const validPassword = await bcrypt.compare(password, user.password_hash);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // Generate token
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
-    // Return user data without password
-    const { password_hash, ...userData } = user;
-    
-    res.json({
-      access_token: token,
-      user: userData
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/api/auth/me', authenticateToken, async (req, res) => {
-  try {
-    const userResult = await pool.query(
-      'SELECT id, email, nome, cognome, created_at FROM users WHERE id = $1',
-      [req.user.userId]
-    );
-    
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    res.json({ user: userResult.rows[0] });
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/auth/logout', (req, res) => {
-  res.json({ message: 'Logged out successfully' });
-});
-
-// Profile routes placeholder
-app.get('/api/profiles/:id', async (req, res) => {
-  // TODO: Implement profile retrieval
-  res.status(501).json({ message: 'Profile endpoint not implemented yet' });
-});
-
-app.put('/api/profiles/:id', async (req, res) => {
-  // TODO: Implement profile update
-  res.status(501).json({ message: 'Profile update endpoint not implemented yet' });
-});
-
-// Events routes
-app.get('/api/events', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT 
-        id, titolo, descrizione, data, ora_inizio, ora_fine, 
-        luogo, tipo_evento, tipo_organico, strumenti_richiesti, 
-        created_by, created_at
-      FROM eventi 
-      ORDER BY data ASC, ora_inizio ASC
-    `);
-    
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Error fetching events:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/events', authenticateToken, async (req, res) => {
-  try {
-    const {
-      titolo, descrizione, data, oraInizio, oraFine,
-      luogo, tipoEvento, tipoOrganico, strumentiRichiesti
-    } = req.body;
-
-    if (!titolo || !data || !luogo) {
-      return res.status(400).json({ error: 'Titolo, data e luogo sono obbligatori' });
-    }
-
-    const result = await pool.query(`
-      INSERT INTO eventi (
-        titolo, descrizione, data, ora_inizio, ora_fine,
-        luogo, tipo_evento, tipo_organico, strumenti_richiesti,
-        created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING *
-    `, [
-      titolo, descrizione, data, oraInizio, oraFine,
-      luogo, tipoEvento, tipoOrganico, 
-      JSON.stringify(strumentiRichiesti), req.user.userId
-    ]);
-
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Error creating event:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Start server
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Bandmate Harmony API server running on port ${port}`);
 });
