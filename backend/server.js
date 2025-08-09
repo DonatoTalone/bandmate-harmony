@@ -2,24 +2,41 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const pool = require('./db');
+const helmet = require('helmet');
 const authRoutes = require('./routes/authRoutes');
-const bandRoutes = require('./routes/bandRoutes');
-const songRoutes = require('./routes/songRoutes');
-const playlistRoutes = require('./routes/playlistRoutes');
-const invitationRoutes = require('./routes/invitationRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
-const searchRoutes = require('./routes/searchRoutes');
+const profilesRoutes = require('./routes/profilesRoutes');
+const eventsRoutes = require('./routes/eventsRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 app.use(cors());
+app.use(helmet());
 app.use(express.json());
 
+// Health check endpoint
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.status(200).json({
+      status: 'healthy',
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+      service: 'bandmate-harmony-backend'
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      database: 'disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// API routes
 app.use('/api/auth', authRoutes);
-app.use('/api/bands', bandRoutes);
-app.use('/api/songs', songRoutes);
-app.use('/api/playlists', playlistRoutes);
-app.use('/api/invitations', invitationRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/search', searchRoutes);
+app.use('/api/profiles', profilesRoutes);
+app.use('/api/events', eventsRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Initialize database tables at startup
 async function initializeDatabase() {
