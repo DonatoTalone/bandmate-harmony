@@ -1,24 +1,24 @@
 version: '3.8'
+
 networks:
   app_net:
     driver: bridge
     
 services:
-  # PostgreSQL Database (deve partire per primo)
+  # PostgreSQL Database
   db:
     image: postgres:16
+    container_name: bandmate_db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: bandmate_harmony
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5432:5432"
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - app_net
-    # Health check per PostgreSQL
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d bandmate_harmony"]
       interval: 10s
@@ -31,45 +31,51 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    ports:
-      - "3001:3001"
+    container_name: bandmate_backend
+    restart: unless-stopped
     environment:
       - DB_HOST=db
       - DB_PORT=5432
       - DB_NAME=bandmate_harmony
       - DB_USER=postgres
       - DB_PASSWORD=postgres
-      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
       - NODE_ENV=production
       - PORT=3001
     depends_on:
       db:
-        condition: service_healthy  # Aspetta che il database sia sano
+        condition: service_healthy
     networks:
       - app_net
-    # Health check per il backend
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    expose:
+      - "3001"
       
-  # Frontend React App
+  # Frontend React App (Coolify esporrà questa porta)
   frontend:
     build: 
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        # ✅ CORRETTO: Punta al nome del servizio backend
-        - VITE_API_URL=http://backend:3001/api
+        # Coolify gestirà il routing, quindi usa percorso relativo
+        - VITE_API_URL=/api
+    container_name: bandmate_frontend
+    restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "80:8080"  # Coolify mapperà questa porta
+    environment:
+      - VITE_API_URL=/api
     depends_on:
       backend:
-        condition: service_healthy  # Aspetta che il backend sia sano
+        condition: service_healthy
     networks:
       - app_net
 
 volumes:
   db_data:
+    driver: local
