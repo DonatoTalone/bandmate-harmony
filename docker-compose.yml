@@ -67,7 +67,7 @@ services:
     container_name: bandmate_frontend
     restart: unless-stopped
     ports:
-      - "80:8080"  # Coolify mapperà questa porta
+      - "80:80"  # Coolify mapperà questa porta
     environment:
       - VITE_API_URL=/api
     depends_on:
