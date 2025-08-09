@@ -1,25 +1,32 @@
 version: '3.8'
-
 networks:
   app_net:
     driver: bridge
     
 services:
-  # Frontend React App
-  frontend:
-    build: 
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        - VITE_API_URL=http://localhost:3001/api
+  # PostgreSQL Database (deve partire per primo)
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: bandmate_harmony
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "8080:8080"
-    depends_on:
-      - backend
+      - "5432:5432"
     networks:
       - app_net
-
-  # Backend API Server (you need to create this)
+    # Health check per PostgreSQL
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bandmate_harmony"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+      
+  # Backend API Server
   backend:
     build:
       context: .
@@ -34,23 +41,33 @@ services:
       - DB_PASSWORD=postgres
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
       - NODE_ENV=production
+      - PORT=3001
     depends_on:
-      - db
+      db:
+        condition: service_healthy  # Aspetta che il database sia sano
     networks:
       - app_net
-
-  # PostgreSQL Database
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: bandmate_harmony
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - db_data:/var/lib/postgresql/data
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    # Health check per il backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+      
+  # Frontend React App
+  frontend:
+    build: 
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # ✅ CORRETTO: Punta al nome del servizio backend
+        - VITE_API_URL=http://backend:3001/api
     ports:
-      - "5432:5432"
+      - "8080:8080"
+    depends_on:
+      backend:
+        condition: service_healthy  # Aspetta che il backend sia sano
     networks:
       - app_net
 
