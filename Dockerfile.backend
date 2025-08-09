@@ -1,15 +1,21 @@
 # Backend Node.js API server
 FROM node:20-alpine
+RUN apk add --no-cache wget
 
 WORKDIR /app
 
 # Install dependencies first for better caching
-COPY backend/package.json ./
-RUN npm install --only=production
+COPY backend/package*.json ./
+RUN npm install --only=production && npm cache clean --force
 
 # Copy backend source
 COPY backend/ .
 
 EXPOSE 3001
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
 
+# Start the server
+CMD ["npm", "start"]
 CMD ["node", "server.js"]
