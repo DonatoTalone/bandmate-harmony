@@ -1,5 +1,5 @@
 
-import { apiCall } from './database';
+import { apiCall, API_BASE_URL } from './database';
 
 /**
  * Upload a file to the backend storage
@@ -15,7 +15,7 @@ export const uploadFile = async (file: File, path?: string): Promise<string> => 
       formData.append('path', path);
     }
     
-    const response = await fetch(`${process.env.VITE_API_URL || 'http://localhost:3001/api'}/upload`, {
+    const response = await fetch(`${API_BASE_URL}/upload`, {
       method: 'POST',
       body: formData,
       headers: {

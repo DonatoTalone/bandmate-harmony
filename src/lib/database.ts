@@ -18,7 +18,7 @@ const dbConfig: DatabaseConfig = {
 };
 
 // API base URL for backend calls
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Helper function to make authenticated API calls
 export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
