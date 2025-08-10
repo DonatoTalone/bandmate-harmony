@@ -15,6 +15,7 @@ import { useProfile } from '@/contexts/ProfileContext';
 import { uploadFile, createBucketIfNotExists } from '@/integrations/supabase/storage';
 import ProfileSettings from '@/components/ProfileSettings';
 import { Strumento } from '@/types';
+import { STRUMENTI } from '@/constants/strumenti';
 
 const ProfileScreen: React.FC = () => {
   const { logout } = useAuth();
@@ -195,12 +196,11 @@ const ProfileScreen: React.FC = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Pianoforte">Pianoforte</SelectItem>
-                        <SelectItem value="Chitarra">Chitarra</SelectItem>
-                        <SelectItem value="Violino">Violino</SelectItem>
-                        <SelectItem value="Batteria">Batteria</SelectItem>
-                        <SelectItem value="Basso">Basso</SelectItem>
-                        <SelectItem value="Voce">Voce</SelectItem>
+                        {STRUMENTI.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

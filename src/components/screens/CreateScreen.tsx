@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useEvents } from '@/contexts/EventsContext';
 import { Strumento } from '@/types';
+import { STRUMENTI } from '@/constants/strumenti';
 
 const CreateScreen: React.FC = () => {
   const { toast } = useToast();
@@ -240,14 +241,11 @@ const CreateScreen: React.FC = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Pianoforte">Pianoforte</SelectItem>
-                          <SelectItem value="Chitarra">Chitarra</SelectItem>
-                          <SelectItem value="Violino">Violino</SelectItem>
-                          <SelectItem value="Batteria">Batteria</SelectItem>
-                          <SelectItem value="Basso">Basso</SelectItem>
-                          <SelectItem value="Voce">Voce</SelectItem>
-                          <SelectItem value="Sassofono">Sassofono</SelectItem>
-                          <SelectItem value="Tromba">Tromba</SelectItem>
+                          {STRUMENTI.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {s}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

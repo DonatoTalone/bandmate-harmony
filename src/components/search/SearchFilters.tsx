@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Filter, X, Search } from 'lucide-react';
 import { Strumento } from '@/types';
+import { STRUMENTI } from '@/constants/strumenti';
 
 interface SearchFiltersProps {
   activeFilters: {
@@ -26,47 +27,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
   onSearch
 }) => {
   // Lista completa degli strumenti dalla definizione dei tipi
-  const strumenti: Strumento[] = [
-    'Voce',
-    'Flauto',
-    'Ottavino',
-    'Oboe',
-    'Corno Inglese',
-    'Fagotto',
-    'Controfagotto',
-    'Clarinetto Mib',
-    'Clarinetto Sib',
-    'Clarinetto Contralto',
-    'Clarinetto Basso in Sib',
-    'Clarinetto Contrabbasso',
-    'Sassofono Soprano',
-    'Sassofono Contralto',
-    'Sassofono Tenore',
-    'Sassofono Baritono',
-    'Sassofono Basso',
-    'Tromba',
-    'Trombino',
-    'Tromba bassa',
-    'Cornetta',
-    'Flicorno Soprano',
-    'Flicorno contralto',
-    'Flicorno tenore',
-    'Flicorno baritono',
-    'Corno',
-    'Trombone Tenore',
-    'Trombone Basso',
-    'Basso Tuba',
-    'Rullante',
-    'Cassa',
-    'Piatti',
-    'Tastiere a percussione',
-    'Batteria',
-    'Percussioni varie',
-    'Pianoforte',
-    'Chitarra',
-    'Basso elettrico',
-    'Altro'
-  ];
+  const strumenti: Strumento[] = STRUMENTI;
 
   const tipiEvento = [
     'Sfilata', 'Concerto', 'Evento Civile', 'Celebrazione Religiosa', 'Evento Benefico', 'Prova', 'Altro'
